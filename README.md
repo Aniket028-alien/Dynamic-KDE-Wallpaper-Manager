@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Dynamic KDE Wallpaper Manager
 
 Switches KDE Plasma wallpaper based on charger state: video wallpaper when plugged in, static image on battery.
@@ -28,6 +27,3 @@ systemctl --user disable --now wallpaper-power.service
 rm ~/.local/bin/wallpaper-power.sh ~/.config/systemd/user/wallpaper-power.service
 ```
 =======
-# Dynamic-KDE-Wallpaper-Manager
-Dynamic KDE Wallpaper Manager is a lightweight Bash automation project designed to make your KDE Plasma desktop smarter by dynamically switching wallpapers based on your laptop's power state.
->>>>>>> dea82bd94a0d8a4704bbdb6531f4ab4f5c73961a
