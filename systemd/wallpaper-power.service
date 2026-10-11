@@ -1,0 +1,10 @@
+[Unit]
+Description=Switch wallpaper based on charger state
+After=plasma-workspace.target
+
+[Service]
+ExecStart=%h/.local/bin/wallpaper-power.sh
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
