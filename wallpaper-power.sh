@@ -13,7 +13,7 @@ CACHE_DIR="${WALLPAPER_CACHE_DIR:-$HOME/Pictures/wallpaper-fetch}"  # downloads
 RES_TIERS="${WALLPAPER_RES_TIERS:-7680x4320 5120x2880 3840x2160 2560x1440 1920x1080}"
 RATIOS="${WALLPAPER_RATIOS:-16x9}"    # Wallhaven aspect ratio ("" = any)
 
-INTERVAL=$((3 * 60 * 60))    # new web wallpaper every 3 hours
+INTERVAL=$(( ${WALLPAPER_INTERVAL_MIN:-10} * 60 ))
 RETRY=300                    # wait 5 min after a failed fetch
 CHECK_EVERY=10               # seconds between state checks
 KEEP=15                      # downloads to keep (high-res files are large)
@@ -134,7 +134,10 @@ cleanup_cache() {
 }
 
 # ---------- mode handlers ----------
+
 mode=""
+force=0
+trap 'force=1; kill "$sleep_pid" 2>/dev/null' USR1
 
 do_video() {
     [ "$mode" = "video" ] && return
@@ -183,6 +186,13 @@ do_web() {
 
 # ---------- main loop ----------
 while true; do
+    if [ "$force" = "1" ]; then
+        force=0
+        rm -f "$LAST_OK" "$LAST_TRY"   # makes a new image due immediately
+        mode=""                        # forces the handlers to re-apply
+        log "Manual switch requested"
+    fi
+
     if [ "$(cat "$AC")" = "1" ]; then
         do_video
     elif online; then
@@ -190,5 +200,10 @@ while true; do
     else
         do_offline
     fi
-    sleep "$CHECK_EVERY"
+
+    if [ "$force" != "1" ]; then
+        sleep "$CHECK_EVERY" &
+        sleep_pid=$!
+        wait "$sleep_pid"
+    fi
 done

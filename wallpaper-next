@@ -1,0 +1,2 @@
+#!/bin/sh
+systemctl --user kill --kill-whom=main -s USR1 wallpaper-power.service
