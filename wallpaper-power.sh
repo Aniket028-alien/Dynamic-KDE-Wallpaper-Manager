@@ -1,38 +1,54 @@
 #!/bin/bash
 
-IMAGE="$HOME/Documents/Wallpaper/wallhaven-l82mz2_3840x2160.png"                        # <- your static image
-VIDEO_PLUGIN="luisbocanegra.smart.video.wallpaper.reborn"   # <- your video plugin ID
-QDBUS=qdbus6                                                # use qdbus on Plasma 5
+VIDEO_PLUGIN="${WALLPAPER_VIDEO_PLUGIN:-luisbocanegra.smart.video.wallpaper.reborn}"
+QDBUS=qdbus6
+STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/wallpaper-power/image"
+mkdir -p "$(dirname "$STATE_FILE")"
 
-# Find the AC adapter state file
-AC=$(ls /sys/class/power_supply/*/online 2>/dev/null | grep -Ei 'AC|ADP' | head -n1)
+AC=$(grep -l '^Mains$' /sys/class/power_supply/*/type 2>/dev/null | head -n1 | sed 's/type$/online/')
+[ -z "$AC" ] && { echo "No AC adapter found" >&2; exit 1; }
+
+js() { $QDBUS org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$1"; }
+
+# Save the image KDE currently has configured for the image plugin
+save_image() {
+    local img
+    img=$(js "
+        var d = desktops()[0];
+        d.currentConfigGroup = ['Wallpaper', 'org.kde.image', 'General'];
+        print(d.readConfig('Image'));")
+    [ -n "$img" ] && echo "$img" > "$STATE_FILE"
+}
 
 set_video() {
-  $QDBUS org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-    var ds = desktops();
-    for (var i = 0; i < ds.length; i++) {
-      ds[i].wallpaperPlugin = '$VIDEO_PLUGIN';
-    }"
+    save_image
+    js "
+        var ds = desktops();
+        for (var i = 0; i < ds.length; i++) {
+            ds[i].wallpaperPlugin = '$VIDEO_PLUGIN';
+        }"
 }
 
 set_image() {
-  $QDBUS org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-    var ds = desktops();
-    for (var i = 0; i < ds.length; i++) {
-      var d = ds[i];
-      d.wallpaperPlugin = 'org.kde.image';
-      d.currentConfigGroup = ['Wallpaper', 'org.kde.image', 'General'];
-      d.writeConfig('Image', 'file://$IMAGE');
-      d.reloadConfig();
-    }"
+    local img
+    img=$(cat "$STATE_FILE" 2>/dev/null)
+    js "
+        var ds = desktops();
+        for (var i = 0; i < ds.length; i++) {
+            var d = ds[i];
+            d.wallpaperPlugin = 'org.kde.image';
+            d.currentConfigGroup = ['Wallpaper', 'org.kde.image', 'General'];
+            if ('$img' !== '') { d.writeConfig('Image', '$img'); }
+            d.reloadConfig();
+        }"
 }
 
 last=""
 while true; do
-  state=$(cat "$AC")
-  if [ "$state" != "$last" ]; then
-    if [ "$state" = "1" ]; then set_video; else set_image; fi
-    last="$state"
-  fi
-  sleep 3
+    state=$(cat "$AC")
+    if [ "$state" != "$last" ]; then
+        if [ "$state" = "1" ]; then set_video; else set_image; fi
+        last="$state"
+    fi
+    sleep 3
 done
