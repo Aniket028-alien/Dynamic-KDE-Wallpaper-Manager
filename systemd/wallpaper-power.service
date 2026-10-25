@@ -8,10 +8,11 @@ ExecStartPre=/bin/sleep 10
 ExecStart=%h/.local/bin/wallpaper-power.sh
 Restart=on-failure
 RestartSec=5
-# Optional settings (uncomment to use):
- Environment=WALLPAPER_SOURCE=konachan
-# Environment=WALLPAPER_WH_QUERY=anime city night
- Environment=WALLPAPER_RES_TIERS=3840x2160 2560x1440
+Environment=WALLPAPER_INTERVAL_MIN=10
+Environment=WALLPAPER_SOURCE=any
+Environment="WALLPAPER_WH_QUERIES=anime city night|anime lonely girl|alone girl|anime night sky girl|anime rain city|anime sitting alone"
+Environment="WALLPAPER_KONA_QUERIES=night city|solo night|scenic night|rain city|solo sky"
+Environment="WALLPAPER_RES_TIERS=3840x2160 2560x1440"
 
 [Install]
 WantedBy=default.target

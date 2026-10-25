@@ -4,8 +4,11 @@ set -o pipefail
 # ---------- settings (override with Environment= in the service) ----------
 VIDEO_PLUGIN="${WALLPAPER_VIDEO_PLUGIN:-luisbocanegra.smart.video.wallpaper.reborn}"
 SOURCE="${WALLPAPER_SOURCE:-any}"                      # wallhaven | konachan | any
-WH_QUERY="${WALLPAPER_WH_QUERY:-nature landscape}"     # Wallhaven search terms
-KONA_TAGS="${WALLPAPER_KONA_TAGS:-scenic landscape}"   # Konachan tags (use underscores)
+
+# Several queries separated by |, one is picked at random on every fetch
+WH_QUERIES="${WALLPAPER_WH_QUERIES:-anime city night|anime lonely girl|alone girl|anime night sky girl|anime rain city|anime sitting alone}"
+KONA_QUERIES="${WALLPAPER_KONA_QUERIES:-night city|solo night|scenic night|rain city|solo sky}"
+
 SAVED_DIR="${WALLPAPER_SAVED_DIR:-$HOME/Documents/Wallpaper}"       # offline fallback
 CACHE_DIR="${WALLPAPER_CACHE_DIR:-$HOME/Pictures/wallpaper-fetch}"  # downloads
 
@@ -13,7 +16,7 @@ CACHE_DIR="${WALLPAPER_CACHE_DIR:-$HOME/Pictures/wallpaper-fetch}"  # downloads
 RES_TIERS="${WALLPAPER_RES_TIERS:-7680x4320 5120x2880 3840x2160 2560x1440 1920x1080}"
 RATIOS="${WALLPAPER_RATIOS:-16x9}"    # Wallhaven aspect ratio ("" = any)
 
-INTERVAL=$(( ${WALLPAPER_INTERVAL_MIN:-10} * 60 ))
+INTERVAL=$(( ${WALLPAPER_INTERVAL_MIN:-10} * 60 ))   # new web wallpaper every N minutes
 RETRY=300                    # wait 5 min after a failed fetch
 CHECK_EVERY=10               # seconds between state checks
 KEEP=15                      # downloads to keep (high-res files are large)
@@ -69,10 +72,14 @@ pick_saved() {
 # ---------- fetching ----------
 fetch() { curl -fsSL -A "wallpaper-power/1.0" "$@"; }
 
+pick_query() { printf '%s' "$1" | tr '|' '\n' | shuf -n1; }
+
 url_wallhaven() {
-    local res="$1"
+    local res="$1" q
+    q=$(pick_query "$WH_QUERIES")
+    log "Wallhaven query: $q"
     local args=(
-        --data-urlencode "q=$WH_QUERY"
+        --data-urlencode "q=$q"
         --data-urlencode "categories=111"
         --data-urlencode "purity=100"
         --data-urlencode "atleast=$res"
@@ -84,10 +91,12 @@ url_wallhaven() {
 }
 
 url_konachan() {
-    local w="${1%x*}" h="${1#*x}"
+    local w="${1%x*}" h="${1#*x}" q
+    q=$(pick_query "$KONA_QUERIES")
+    log "Konachan tags: $q"
     fetch --max-time 15 -G "https://konachan.net/post.json" \
         --data-urlencode "limit=20" \
-        --data-urlencode "tags=order:random rating:safe width:>=$w height:>=$h $KONA_TAGS" \
+        --data-urlencode "tags=order:random rating:safe width:>=$w height:>=$h $q" \
         | jq -r '.[].file_url' | shuf -n1
 }
 
@@ -134,10 +143,10 @@ cleanup_cache() {
 }
 
 # ---------- mode handlers ----------
-
 mode=""
 force=0
-trap 'force=1; kill "$sleep_pid" 2>/dev/null' USR1
+sleep_pid=""
+trap 'force=1; [ -n "$sleep_pid" ] && kill "$sleep_pid" 2>/dev/null' USR1
 
 do_video() {
     [ "$mode" = "video" ] && return
